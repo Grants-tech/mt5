@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">mt-5</string>
+    <string name="title_activity_main">mt-5</string>
+    <string name="package_name">com.Grants.mt5</string>
+    <string name="custom_url_scheme">com.Grants.mt5</string>
+</resources>

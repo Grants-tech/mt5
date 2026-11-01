@@ -1,0 +1,667 @@
+.pageWrapper {
+  min-height: 100vh;
+  background-color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.mobileContainer {
+  width: 100%;
+  max-width: 400px;
+  height: 100dvh;
+  max-height: 850px;
+  background-color: #000;
+  color: #fff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+@media (min-width: 400px) {
+  .mobileContainer {
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: #d1d5db;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.iconButton:hover {
+  color: #fff;
+}
+
+.tradeInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.tradeLabel {
+  font-size: 10px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tradeValue {
+  font-size: 14px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #e5e7eb;
+}
+
+.contentArea {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.statsSection {
+  padding: 12px 16px;
+  font-size: 12px;
+  line-height: 1.8;
+  background-color: #0a0a0a;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.sectionHeader {
+  background-color: #1f2937;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.dots {
+  letter-spacing: 2px;
+  position: relative;
+  top: 4px;
+  font-size: 16px;
+}
+
+.listContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.positionItem {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #1a1a1a;
+  background-color: #000;
+}
+
+.posDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.symbolLine {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sellText {
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.buyText {
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.priceLine {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.arrow {
+  color: #6b7280;
+  margin: 0 4px;
+}
+
+.posRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.profitText {
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.lossText {
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.closeBtn {
+  background-color: #333;
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background-color: #555;
+}
+
+.quoteItem {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.quoteLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quoteSymbol {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.textGreen {
+  color: #10b981;
+  font-size: 11px;
+}
+
+.textRed {
+  color: #ef4444;
+  font-size: 11px;
+}
+
+.quoteRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.quotePrices {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.quoteActions {
+  display: flex;
+  gap: 8px;
+}
+
+.btnSell,
+.btnBuy {
+  border: none;
+  padding: 4px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.btnSell {
+  background-color: #ef4444;
+}
+
+.btnSell:hover {
+  background-color: #dc2626;
+}
+
+.btnBuy {
+  background-color: #3b82f6;
+}
+
+.btnBuy:hover {
+  background-color: #2563eb;
+}
+
+.placeholderTab {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  gap: 8px;
+}
+
+.placeholderTab span {
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.bottomNav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0 20px 0;
+  background-color: #111;
+  border-top: 1px solid #333;
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+  width: 20%;
+}
+
+.navItem:hover {
+  color: #fff;
+}
+
+.navText {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.activeNavItem {
+  color: #3b82f6;
+}
+
+.activeIconWrapper {
+  background-color: #1e3a8a;
+  border-radius: 9999px;
+  padding: 4px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #60a5fa;
+}
+
+.activeNavText {
+  color: #fff;
+}
+
+.messageIconWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background-color: #dc2626;
+  color: white;
+  font-size: 8px;
+  font-weight: 700;
+  height: 14px;
+  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #111;
+}
+
+.slTpLine {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.slText { color: #ef4444; }
+.tpText { color: #10b981; }
+
+.posActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconActionBtn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.iconActionBtn:hover { color: #fff; }
+
+/* Modal Styles */
+.modalOverlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modalContent {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 320px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 10px;
+}
+
+.closeIcon {
+  background: none; border: none; color: #9ca3af; cursor: pointer;
+}
+.closeIcon:hover { color: #fff; }
+
+.ticketRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #d1d5db;
+}
+
+.ticketInput {
+  background-color: #000;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 4px;
+  width: 100px;
+  text-align: right;
+  font-family: monospace;
+  outline: none;
+}
+
+.ticketInput:focus {
+  border-color: #3b82f6;
+}
+
+.ticketPrice {
+  font-family: monospace;
+  color: #fff;
+  font-weight: 700;
+}
+
+.confirmBtn {
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  color: #fff;
+  margin-top: 8px;
+}
+
+.bgBlue { background-color: #3b82f6; }
+.bgBlue:hover { background-color: #2563eb; }
+.bgRed { background-color: #ef4444; }
+.bgRed:hover { background-color: #dc2626; }
+.textBlue { color: #3b82f6; }
+
+/* --- Append these to your existing MT5Simulator.module.css --- */
+
+/* Dropdown Menus */
+.dropdownMenu {
+  position: absolute;
+  top: 40px;
+  background-color: #2c2f36;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px 0;
+  z-index: 100;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.dropdownItem {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.dropdownItem:hover { background-color: #3b82f6; }
+.sortArrow { color: #3b82f6; font-weight: bold; }
+
+/* Sidebar */
+.sidebarOverlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  z-index: 200;
+}
+.sidebar {
+  width: 260px;
+  height: 100%;
+  background-color: #1a1a1a;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  animation: slideIn 0.2s ease-out;
+}
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.sidebarHeader {
+  padding: 0 20px 20px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: bold;
+  font-size: 16px;
+  border-bottom: 1px solid #333;
+}
+.sidebarItem {
+  padding: 15px 20px;
+  font-size: 14px;
+  color: #d1d5db;
+  cursor: pointer;
+}
+.sidebarItem:hover { background-color: #222; color: #fff; }
+.sidebarDivider { height: 1px; background-color: #333; margin: 10px 0; }
+
+/* History Tab */
+.historyItem {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1a1a1a;
+}
+.historyTime { font-size: 10px; color: #9ca3af; margin-bottom: 2px; }
+.historyPrices { font-size: 11px; color: #9ca3af; font-family: monospace; }
+
+/* --- FULL ORDER PAGE STYLES --- */
+.orderPage {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: #000;
+}
+
+.orderTopBar {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.volumeSelector {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+.volBtn { padding: 5px; }
+.volBtn:nth-child(4) { color: #fff; font-weight: bold; font-size: 15px; }
+
+.priceDisplay {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin: 30px 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+.sellPrice { color: #d946ef; } /* Magenta */
+.buyPrice { color: #d946ef; }  /* Magenta */
+
+.slTpControls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.slTpBox {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+.slTpBox button {
+  background: none; border: none; color: #3b82f6; font-size: 20px; font-weight: bold;
+}
+
+.fillPolicy {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.chartPreview {
+  flex-grow: 1;
+  position: relative;
+  margin: 20px 0;
+  border-right: 1px solid #333;
+}
+.chartLineRed { position: absolute; right: 0; width: 100%; border-bottom: 1px solid #ef4444; display: flex; justify-content: flex-end; }
+.chartLineRed span { background-color: #ef4444; color: #fff; font-size: 10px; padding: 2px 4px; margin-top: -8px; }
+.chartLineDash { position: absolute; right: 0; width: 100%; border-bottom: 1px dashed #666; }
+.chartLineBlue { position: absolute; right: 0; width: 100%; border-bottom: 1px solid #3b82f6; display: flex; justify-content: flex-end; }
+.chartLineBlue span { background-color: #3b82f6; color: #fff; font-size: 10px; padding: 2px 4px; margin-top: -8px; }
+
+.orderWarning {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.bottomActionButtons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+}
+.btnActionSell, .btnActionBuy {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+.btnActionSell span { color: #ef4444; font-size: 18px; font-weight: 700; }
+.btnActionSell small { color: #ef4444; font-size: 10px; }
+.btnActionBuy span { color: #3b82f6; font-size: 18px; font-weight: 700; }
+.btnActionBuy small { color: #3b82f6; font-size: 10px; }
+.divider { width: 1px; height: 40px; background-color: #333; }
