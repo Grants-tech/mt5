@@ -45,55 +45,51 @@ export default function MT5Simulator() {
   // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
     // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
     // --- CORE ENGINE: Live Ticker & SL/TP Checks ---
-  useEffect(() => {
-       const fetchLivePrice = async () => {
-      try {
-        // Use a CORS proxy to bypass Android WebView restrictions
-        const targetUrl = encodeURIComponent("https://xaus.com/api/v1/spot?compact=1");
-        const res = await fetch(`https://api.allorigins.win/raw?url=${targetUrl}`);
-        
-        if (!res.ok) return; 
-        
-        const data = await res.json();
-        
-        // SAFETY CHECK: If it's the weekend, the API might return nothing.
-        // We only update the price if we actually got a valid number back.
-        if (data && data.xau && data.xau.price) {
-           setQuotes((prevQuotes) =>
-            prevQuotes.map((q) => {
-              if (q.symbol === "XAUUSD") {
-                const spread = 0.17;
-                return { ...q, bid: data.xau.price, ask: data.xau.price + spread };
-              }
-              return q;
-            })
-          );
-        }
-      } catch (err) {
-        console.log("Market closed or network error. Keeping simulated price.");
-      }
-    };
-    // Fetch immediately, then every 5 seconds
-    fetchLivePrice();
-    const priceInterval = setInterval(fetchLivePrice, 5000);
+ const engineInterval = setInterval(() => {
+  const current = positionsRef.current;
+  if (!current.length) return;
 
-    // Keep your SL/TP logic running every second
-    const engineInterval = setInterval(() => {
-      setPositions((currentPos) => {
-        // ... (Keep your existing SL/TP and P&L logic here, unchanged) ...
-        // Just ensure you're referencing the latest `quotes` state
-        // You may need to move the SL/TP logic into a separate function or
-        // use `quotesRef` to access the latest prices.
+  const closed = [];
+  const stillOpen = [];
+
+  current.forEach((pos) => {
+    const base = pos.symbol.replace(".pro", "");
+    const q = quotesRef.current.find((x) => x.symbol === base);
+    if (!q) { stillOpen.push(pos); return; }
+
+    const isBuy = pos.type === "buy";
+    const price = isBuy ? q.bid : q.ask;           // close at the opposite side
+    const diff = isBuy ? price - pos.openPrice : pos.openPrice - price;
+    const contractSize = base === "XAUUSD" ? 100 : 100000;
+    let profit = diff * pos.volume * contractSize;
+    if (base === "USDJPY") profit /= price;        // JPY profit converted to USD
+
+    const updated = { ...pos, currentPrice: price, profit };
+
+    let reason = null;
+    if (pos.sl > 0 && (isBuy ? price <= pos.sl : price >= pos.sl)) reason = "SL";
+    if (pos.tp > 0 && (isBuy ? price >= pos.tp : price <= pos.tp)) reason = "TP";
+
+    if (reason) {
+      closed.push({
+        ...updated,
+        closePrice: price,
+        closeTime: new Date().toLocaleTimeString(),
+        reason,
       });
-    }, 1000);
+    } else {
+      stillOpen.push(updated);
+    }
+  });
 
-    return () => {
-      clearInterval(priceInterval);
-      clearInterval(engineInterval);
-    };
-  }, []);
- 
-      
+  setPositions(stillOpen);
+  if (closed.length) {
+    const pnl = closed.reduce((s, p) => s + p.profit, 0);
+    setAccount((prev) => ({ ...prev, balance: prev.balance + pnl }));
+    setHistory((prev) => [...closed.reverse(), ...prev]);
+  }
+}, 1000);
+
   // --- RECALCULATE ACCOUNT METRICS ---
   useEffect(() => {
     const floatingProfit = positions.reduce((sum, pos) => sum + pos.profit, 0);
