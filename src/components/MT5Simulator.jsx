@@ -10,9 +10,31 @@ import {
 
 const INITIAL_QUOTES = [
   { symbol: "EURUSD", bid: 1.08450, ask: 1.08465, change: 0.12 },
-  { symbol: "XAUUSD", bid: 3880.88, ask: 3881.05, change: -0.45 },
+  { symbol: "XAUUSD", bid: 3907.00, ask: 3907.17, change: -0.45 },
   { symbol: "GBPUSD", bid: 1.26320, ask: 1.26340, change: 0.08 },
   { symbol: "USDJPY", bid: 149.450, ask: 149.465, change: 0.25 },
+];
+
+const SPREAD = 0.17;
+
+const GOLD_SOURCES = [
+  {
+    name: "gold-api",
+    url: "https://api.gold-api.com/price/XAU",
+    parse: (d) => {
+      const p = Number(d?.price);
+      return p > 0 ? { bid: p, ask: p + SPREAD } : null;
+    },
+  },
+  {
+    name: "binance-paxg",
+    url: "https://api.binance.com/api/v3/ticker/bookTicker?symbol=PAXGUSDT",
+    parse: (d) => {
+      const bid = Number(d?.bidPrice);
+      const ask = Number(d?.askPrice);
+      return bid > 0 && ask > 0 ? { bid, ask } : null;
+    },
+  },
 ];
 
 export default function MT5Simulator() {
@@ -42,53 +64,87 @@ export default function MT5Simulator() {
   const positionsRef = useRef(positions);
   positionsRef.current = positions;
 
-  // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
-    // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
-    // --- CORE ENGINE: Live Ticker & SL/TP Checks ---
- const engineInterval = setInterval(() => {
-  const current = positionsRef.current;
-  if (!current.length) return;
+   // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
+  useEffect(() => {
+    // 1) LIVE XAUUSD PRICE
+    const fetchLivePrice = async () => {
+      for (const src of GOLD_SOURCES) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 4000);
+          const res = await fetch(src.url, { signal: ctrl.signal, cache: "no-store" });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  const closed = [];
-  const stillOpen = [];
+          const quote = src.parse(await res.json());
+          if (!quote) throw new Error("unexpected response shape");
 
-  current.forEach((pos) => {
-    const base = pos.symbol.replace(".pro", "");
-    const q = quotesRef.current.find((x) => x.symbol === base);
-    if (!q) { stillOpen.push(pos); return; }
+          setQuotes((prev) =>
+            prev.map((q) => (q.symbol === "XAUUSD" ? { ...q, ...quote } : q))
+          );
+          console.log(`[price] ${src.name}: ${quote.bid}`);
+          return; // success, skip remaining sources
+        } catch (err) {
+          console.warn(`[price] ${src.name} failed:`, err.message);
+        }
+      }
+    };
 
-    const isBuy = pos.type === "buy";
-    const price = isBuy ? q.bid : q.ask;           // close at the opposite side
-    const diff = isBuy ? price - pos.openPrice : pos.openPrice - price;
-    const contractSize = base === "XAUUSD" ? 100 : 100000;
-    let profit = diff * pos.volume * contractSize;
-    if (base === "USDJPY") profit /= price;        // JPY profit converted to USD
+    fetchLivePrice();
+    const priceInterval = setInterval(fetchLivePrice, 5000);
 
-    const updated = { ...pos, currentPrice: price, profit };
+    // 2) SL/TP + P&L ENGINE (runs every second)
+    const engineInterval = setInterval(() => {
+      const current = positionsRef.current;
+      if (!current.length) return;
 
-    let reason = null;
-    if (pos.sl > 0 && (isBuy ? price <= pos.sl : price >= pos.sl)) reason = "SL";
-    if (pos.tp > 0 && (isBuy ? price >= pos.tp : price <= pos.tp)) reason = "TP";
+      const closed = [];
+      const stillOpen = [];
 
-    if (reason) {
-      closed.push({
-        ...updated,
-        closePrice: price,
-        closeTime: new Date().toLocaleTimeString(),
-        reason,
+      current.forEach((pos) => {
+        const base = pos.symbol.replace(".pro", "");
+        const q = quotesRef.current.find((x) => x.symbol === base);
+        if (!q) { stillOpen.push(pos); return; }
+
+        const isBuy = pos.type === "buy";
+        const price = isBuy ? q.bid : q.ask;
+        const diff = isBuy ? price - pos.openPrice : pos.openPrice - price;
+        const contractSize = base === "XAUUSD" ? 100 : 100000;
+        let profit = diff * pos.volume * contractSize;
+        if (base === "USDJPY") profit /= price;
+
+        const updated = { ...pos, currentPrice: price, profit };
+
+        let reason = null;
+        if (pos.sl > 0 && (isBuy ? price <= pos.sl : price >= pos.sl)) reason = "SL";
+        if (pos.tp > 0 && (isBuy ? price >= pos.tp : price <= pos.tp)) reason = "TP";
+
+        if (reason) {
+          closed.push({
+            ...updated,
+            closePrice: price,
+            closeTime: new Date().toLocaleTimeString(),
+            reason,
+          });
+        } else {
+          stillOpen.push(updated);
+        }
       });
-    } else {
-      stillOpen.push(updated);
-    }
-  });
 
-  setPositions(stillOpen);
-  if (closed.length) {
-    const pnl = closed.reduce((s, p) => s + p.profit, 0);
-    setAccount((prev) => ({ ...prev, balance: prev.balance + pnl }));
-    setHistory((prev) => [...closed.reverse(), ...prev]);
-  }
-}, 1000);
+      setPositions(stillOpen);
+      if (closed.length) {
+        const pnl = closed.reduce((s, p) => s + p.profit, 0);
+        setAccount((prev) => ({ ...prev, balance: prev.balance + pnl }));
+        setHistory((prev) => [...closed.reverse(), ...prev]);
+      }
+    }, 1000);
+
+    // 3) CLEANUP
+    return () => {
+      clearInterval(priceInterval);
+      clearInterval(engineInterval);
+    };
+  }, []);
 
   // --- RECALCULATE ACCOUNT METRICS ---
   useEffect(() => {
