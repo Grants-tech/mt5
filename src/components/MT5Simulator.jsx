@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./MT5Simulator.module.css";
+import useLivePrices from "./useLivePrices";
 import {
   Menu, Wallet, ArrowUpDown, FilePlus, Activity,
   CandlestickChart, History, MessageSquare, X, Plus,
@@ -15,32 +16,25 @@ const INITIAL_QUOTES = [
   { symbol: "USDJPY", bid: 149.450, ask: 149.465, change: 0.25 },
 ];
 
-const SPREAD = 0.17;
+// Profit in USD for a position at a given price
+const calcProfit = (base, type, volume, openPrice, price) => {
+  const diff = type === "buy" ? price - openPrice : openPrice - price;
+  const contractSize = base === "XAUUSD" ? 100 : 100000;
+  let profit = diff * volume * contractSize;
+  if (base === "USDJPY") profit /= price; // JPY profit converted to USD
+  return profit;
+};
 
-const GOLD_SOURCES = [
-  {
-    name: "gold-api",
-    url: "https://api.gold-api.com/price/XAU",
-    parse: (d) => {
-      const p = Number(d?.price);
-      return p > 0 ? { bid: p, ask: p + SPREAD } : null;
-    },
-  },
-  {
-    name: "binance-paxg",
-    url: "https://api.binance.com/api/v3/ticker/bookTicker?symbol=PAXGUSDT",
-    parse: (d) => {
-      const bid = Number(d?.bidPrice);
-      const ask = Number(d?.askPrice);
-      return bid > 0 && ask > 0 ? { bid, ask } : null;
-    },
-  },
-];
+// Step size / decimals used by the +/- buttons on the order page
+const symbolMeta = (sym) =>
+  sym === "XAUUSD" ? { step: 0.1, dp: 2 }
+  : sym === "USDJPY" ? { step: 0.01, dp: 3 }
+  : { step: 0.0001, dp: 5 };
 
 export default function MT5Simulator() {
   const [activeTab, setActiveTab] = useState("trade");
   const [subView, setSubView] = useState(null); // For New Order page
-  const [quotes, setQuotes] = useState(INITIAL_QUOTES);
+  const { quotes, quotesRef, status: priceStatus } = useLivePrices(INITIAL_QUOTES);
   
   // UI States
   const [showSidebar, setShowSidebar] = useState(false);
@@ -53,47 +47,19 @@ export default function MT5Simulator() {
   const [account, setAccount] = useState({ balance: 10000.0, equity: 10000.0, margin: 0, freeMargin: 10000.0, marginLevel: 0 });
   const [positions, setPositions] = useState([]);
   const [history, setHistory] = useState([]);
+  const [orderError, setOrderError] = useState("");
   
   // New Order State
   const [newOrder, setNewOrder] = useState({
     symbol: "XAUUSD", type: "buy", volume: 0.01, sl: "", tp: "", price: 0
   });
 
-  const quotesRef = useRef(quotes);
-  quotesRef.current = quotes;
   const positionsRef = useRef(positions);
   positionsRef.current = positions;
 
    // --- CORE ENGINE: Live Ticker, SL/TP Checks, and P&L ---
   useEffect(() => {
-    // 1) LIVE XAUUSD PRICE
-    const fetchLivePrice = async () => {
-      for (const src of GOLD_SOURCES) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 4000);
-          const res = await fetch(src.url, { signal: ctrl.signal, cache: "no-store" });
-          clearTimeout(timer);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-          const quote = src.parse(await res.json());
-          if (!quote) throw new Error("unexpected response shape");
-
-          setQuotes((prev) =>
-            prev.map((q) => (q.symbol === "XAUUSD" ? { ...q, ...quote } : q))
-          );
-          console.log(`[price] ${src.name}: ${quote.bid}`);
-          return; // success, skip remaining sources
-        } catch (err) {
-          console.warn(`[price] ${src.name} failed:`, err.message);
-        }
-      }
-    };
-
-    fetchLivePrice();
-    const priceInterval = setInterval(fetchLivePrice, 5000);
-
-    // 2) SL/TP + P&L ENGINE (runs every second)
+    // SL/TP + P&L ENGINE (checks 10x per second against the latest tick)
     const engineInterval = setInterval(() => {
       const current = positionsRef.current;
       if (!current.length) return;
@@ -107,24 +73,25 @@ export default function MT5Simulator() {
         if (!q) { stillOpen.push(pos); return; }
 
         const isBuy = pos.type === "buy";
-        const price = isBuy ? q.bid : q.ask;
-        const diff = isBuy ? price - pos.openPrice : pos.openPrice - price;
-        const contractSize = base === "XAUUSD" ? 100 : 100000;
-        let profit = diff * pos.volume * contractSize;
-        if (base === "USDJPY") profit /= price;
-
+        const marketPx = isBuy ? q.bid : q.ask;
+        // Price starts at the entry and then moves 1:1 with the live market
+        const anchor = pos.anchor ?? pos.openPrice;
+        const price = pos.openPrice + (marketPx - anchor);
+        const profit = calcProfit(base, pos.type, pos.volume, pos.openPrice, price);
         const updated = { ...pos, currentPrice: price, profit };
 
-        let reason = null;
-        if (pos.sl > 0 && (isBuy ? price <= pos.sl : price >= pos.sl)) reason = "SL";
-        if (pos.tp > 0 && (isBuy ? price >= pos.tp : price <= pos.tp)) reason = "TP";
+        // Stop Loss is intentionally display-only: it NEVER closes a trade.
+        // Only Take Profit closes automatically (filled at the TP price).
+        const tpHit = pos.tp > 0 && (isBuy ? price >= pos.tp : price <= pos.tp);
 
-        if (reason) {
+        if (tpHit) {
           closed.push({
             ...updated,
-            closePrice: price,
+            currentPrice: pos.tp,
+            closePrice: pos.tp,
+            profit: calcProfit(base, pos.type, pos.volume, pos.openPrice, pos.tp),
             closeTime: new Date().toLocaleTimeString(),
-            reason,
+            reason: "TP",
           });
         } else {
           stillOpen.push(updated);
@@ -137,11 +104,10 @@ export default function MT5Simulator() {
         setAccount((prev) => ({ ...prev, balance: prev.balance + pnl }));
         setHistory((prev) => [...closed.reverse(), ...prev]);
       }
-    }, 1000);
+    }, 100);
 
-    // 3) CLEANUP
+    // CLEANUP
     return () => {
-      clearInterval(priceInterval);
       clearInterval(engineInterval);
     };
   }, []);
@@ -166,30 +132,74 @@ export default function MT5Simulator() {
       volume: 0.01,
       sl: "",
       tp: "",
-      price: type === "buy" ? q.ask : q.bid
+      price: "" // empty = market price; type a number to enter manually
     });
+    setOrderError("");
     setSubView("order");
     setShowSidebar(false);
   };
 
-  const executeOrder = () => {
-    const q = quotes.find(q => q.symbol === newOrder.symbol);
-    const price = newOrder.type === "buy" ? q.ask : q.bid;
-    
+  const setField = (field, value) => {
+    setOrderError("");
+    setNewOrder((o) => ({ ...o, [field]: value }));
+  };
+
+  const nudge = (field, dir) => {
+    const q = quotes.find((x) => x.symbol === newOrder.symbol);
+    const { step, dp } = symbolMeta(newOrder.symbol);
+    const ref = parseFloat(newOrder.price) || (q ? (q.bid + q.ask) / 2 : 0);
+    const base = parseFloat(newOrder[field]) || ref;
+    setField(field, (base + dir * step).toFixed(dp));
+  };
+
+  const executeOrder = (type) => {
+    const q = quotes.find((x) => x.symbol === newOrder.symbol);
+    const isBuy = type === "buy";
+
+    // Entry price: typed value, or market if the field is empty
+    const hasTyped = String(newOrder.price).trim() !== "";
+    const typed = parseFloat(newOrder.price);
+    if (hasTyped && !(typed > 0)) {
+      setOrderError("Invalid price. Enter a number, or clear it to use the market price.");
+      return;
+    }
+    const price = hasTyped ? typed : (isBuy ? q.ask : q.bid);
+
+    const sl = parseFloat(newOrder.sl) || 0;
+    const tp = parseFloat(newOrder.tp) || 0;
+    if (sl > 0 && (isBuy ? sl >= price : sl <= price)) {
+      setOrderError(`Invalid S/L: for a ${type} it must be ${isBuy ? "below" : "above"} the entry price.`);
+      return;
+    }
+    if (tp > 0 && (isBuy ? tp <= price : tp >= price)) {
+      setOrderError(`Invalid T/P: for a ${type} it must be ${isBuy ? "above" : "below"} the entry price.`);
+      return;
+    }
+
+    const volume = parseFloat(newOrder.volume);
+    const base = newOrder.symbol;
+    const marketNow = isBuy ? q.bid : q.ask;
+    // Manual entry: anchor to the market right now, so profit starts at 0 from the typed price.
+    // Market entry: anchor to the fill price, so the normal spread cost still shows.
+    const anchor = hasTyped ? marketNow : price;
+    const startPrice = price + (marketNow - anchor);
+
     const pos = {
       id: Date.now(),
-      symbol: newOrder.symbol === "XAUUSD" ? "XAUUSD.pro" : newOrder.symbol,
-      type: newOrder.type,
-      volume: parseFloat(newOrder.volume),
+      symbol: base === "XAUUSD" ? "XAUUSD.pro" : base,
+      type,
+      volume,
       openPrice: price,
-      currentPrice: price,
-      sl: parseFloat(newOrder.sl) || 0,
-      tp: parseFloat(newOrder.tp) || 0,
-      profit: 0,
+      anchor,
+      currentPrice: startPrice,
+      sl,
+      tp,
+      profit: calcProfit(base, type, volume, price, startPrice),
       openTime: new Date().toLocaleTimeString()
     };
 
     setPositions([pos, ...positions]);
+    setOrderError("");
     setSubView(null);
     setActiveTab("trade");
   };
@@ -235,7 +245,7 @@ export default function MT5Simulator() {
 
           <div className={styles.orderPage}>
             <div className={styles.orderTopBar}>
-              <span>Market Execution</span>
+              <span>{String(newOrder.price).trim() ? "Manual Entry" : "Market Execution"}</span>
             </div>
             
             <div className={styles.volumeSelector}>
@@ -249,16 +259,46 @@ export default function MT5Simulator() {
               <span className={styles.buyPrice}>{quotes.find(q => q.symbol === newOrder.symbol)?.ask.toFixed(2)}</span>
             </div>
 
+            {/* Entry price: leave empty for market, or type your own */}
+            <div className={styles.slTpControls}>
+              <div className={styles.slTpBox} style={{ width: "100%" }}>
+                <button onClick={() => nudge("price", -1)}>-</button>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={`Price (market ${quotes.find(q => q.symbol === newOrder.symbol)?.ask.toFixed(symbolMeta(newOrder.symbol).dp)})`}
+                  value={newOrder.price}
+                  onChange={(e) => setField("price", e.target.value.replace(/[^0-9.]/g, ""))}
+                  style={{ flex: 1, minWidth: 0, width: "100%", textAlign: "center", background: "transparent", border: "none", outline: "none", color: "inherit", font: "inherit" }}
+                />
+                <button onClick={() => nudge("price", 1)}>+</button>
+              </div>
+            </div>
+
             <div className={styles.slTpControls}>
               <div className={styles.slTpBox}>
-                <button>-</button>
-                <span>SL</span>
-                <button>+</button>
+                <button onClick={() => nudge("sl", -1)}>-</button>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="SL"
+                  value={newOrder.sl}
+                  onChange={(e) => setField("sl", e.target.value.replace(/[^0-9.]/g, ""))}
+                  style={{ flex: 1, minWidth: 0, width: "100%", textAlign: "center", background: "transparent", border: "none", outline: "none", color: "inherit", font: "inherit" }}
+                />
+                <button onClick={() => nudge("sl", 1)}>+</button>
               </div>
               <div className={styles.slTpBox}>
-                <button>-</button>
-                <span>TP</span>
-                <button>+</button>
+                <button onClick={() => nudge("tp", -1)}>-</button>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="TP"
+                  value={newOrder.tp}
+                  onChange={(e) => setField("tp", e.target.value.replace(/[^0-9.]/g, ""))}
+                  style={{ flex: 1, minWidth: 0, width: "100%", textAlign: "center", background: "transparent", border: "none", outline: "none", color: "inherit", font: "inherit" }}
+                />
+                <button onClick={() => nudge("tp", 1)}>+</button>
               </div>
             </div>
 
@@ -274,16 +314,22 @@ export default function MT5Simulator() {
             </div>
 
             <div className={styles.orderWarning}>
-              Attention! The trade will be executed at market conditions, difference with requested price may be significant!
+              {String(newOrder.price).trim()
+                ? "The position opens at the price you typed with zero profit, then follows the live market from there."
+                : "Attention! The trade will be executed at market conditions, difference with requested price may be significant!"}
             </div>
 
+            {orderError && (
+              <div style={{ color: "#ef4444", fontSize: "12px", padding: "6px 12px" }}>{orderError}</div>
+            )}
+
             <div className={styles.bottomActionButtons}>
-              <div onClick={executeOrder} className={styles.btnActionSell}>
+              <div onClick={() => executeOrder("sell")} className={styles.btnActionSell}>
                 <span>SELL</span>
                 <small>BY MARKET</small>
               </div>
               <div className={styles.divider}></div>
-              <div onClick={executeOrder} className={styles.btnActionBuy}>
+              <div onClick={() => executeOrder("buy")} className={styles.btnActionBuy}>
                 <span>BUY</span>
                 <small>BY MARKET</small>
               </div>
@@ -399,6 +445,12 @@ export default function MT5Simulator() {
                         <div className={styles.priceLine}>
                           {pos.openPrice.toFixed(2)} <span className={styles.arrow}>→</span> {pos.currentPrice.toFixed(2)}
                         </div>
+                        {(pos.sl > 0 || pos.tp > 0) && (
+                          <div className={styles.priceLine} style={{ fontSize: "11px", opacity: 0.7 }}>
+                            {pos.sl > 0 && `S/L: ${pos.sl.toFixed(2)}  `}
+                            {pos.tp > 0 && `T/P: ${pos.tp.toFixed(2)}`}
+                          </div>
+                        )}
                       </div>
                       <div className={styles.posRight}>
                         <span className={pos.profit >= 0 ? styles.profitText : styles.lossText}>
@@ -415,6 +467,9 @@ export default function MT5Simulator() {
 
           {activeTab === "quotes" && (
             <>
+              <div style={{ fontSize: "11px", opacity: 0.6, padding: "4px 12px" }}>
+                XAUUSD feed: {priceStatus === "live" ? "● live (websocket)" : priceStatus === "polling" ? "○ polling (fallback)" : "connecting..."}
+              </div>
               <div className={styles.sectionHeader}>
                 <span>Symbol</span>
                 <span>Bid / Ask</span>
